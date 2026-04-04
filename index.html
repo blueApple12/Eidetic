@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
+<title>EIDETIC | Intuition Engine</title>
+<link href="https://fonts.googleapis.com/css2?family=Assistant:wght@300;400;600;700&family=Cinzel:wght@500;700&display=swap" rel="stylesheet">
+<style>
+:root {
+  --bg: #09090b;
+  --s1: #121214;
+  --s2: #1c1c20;
+  --border: #2a2a30;
+  --accent: #d4af37;
+  --accent-dim: rgba(212, 175, 55, 0.15);
+  --red: #e16b76;
+  --amber: #d4af37;
+  --green: #68b89e;
+  --text: #eaeaea;
+  --dim: #8b8b93;
+  --title-font: 'Cinzel', serif;
+  --sans: 'Assistant', sans-serif;
+  --radius: 12px;
+  --safe-bottom: env(safe-area-inset-bottom, 0px);
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+
+body {
+  background: radial-gradient(circle at top, #141418 0%, var(--bg) 100%);
+  color: var(--text);
+  font-family: var(--sans);
+  min-height: 100vh;
+  direction: rtl;
+  overflow-x: hidden;
+  letter-spacing: 0.3px;
+  overscroll-behavior: none;
+}
+
+header {
+  direction: ltr;
+  padding: 12px 16px 8px;
+  margin-bottom: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(255,255,255,0.04);
+  position: sticky; top: 0; z-index: 10;
+  background: rgba(9,9,11,0.92);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.logo-container { display: flex; flex-direction: column; align-items: flex-start; }
+.logo { font-family: var(--title-font); font-size: 18px; color: var(--accent); letter-spacing: 5px; font-weight: 700; }
+.logo-sub { font-size: 8px; color: var(--dim); letter-spacing: 2px; margin-top: 1px; text-transform: uppercase; }
+.version { font-size: 10px; color: var(--dim); opacity: 0.6; }
+
+.main {
+  padding: 0 10px calc(15px + var(--safe-bottom));
+  display: flex; flex-direction: column; gap: 8px;
+  max-width: 680px; margin: 0 auto;
+}
+
+.card {
+  background: var(--s1); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 12px;
+  box-shadow: 0 4px 18px rgba(0,0,0,0.22);
+}
+
+.card-title {
+  font-size: 10px; letter-spacing: 2px; color: var(--accent);
+  text-transform: uppercase; margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px; font-weight: 600;
+  opacity: 0.8;
+}
+.card-title::before { content:''; display:inline-block; width:2px; height:9px; background:var(--accent); border-radius:1px; flex-shrink:0; }
+
+.setup-row { display: grid; grid-template-columns: 80px 1fr; gap: 8px; }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label { font-size: 10px; color: var(--dim); font-weight: 600; }
+.field input, .field select {
+  background: var(--s2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; font-size: 15px; font-family: var(--sans);
+  border-radius: 6px; outline: none; transition: 0.2s; width: 100%; min-height: 40px;
+}
+.field input:focus { border-color: var(--accent); }
+
+.gender-toggle { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; }
+.gender-btn, .toggle-btn {
+  background: var(--s2); border: 1px solid var(--border); color: var(--dim);
+  padding: 8px 2px; text-align: center; cursor: pointer; font-size: 12px; font-weight: 700;
+  border-radius: 6px; transition: 0.18s; user-select: none; touch-action: manipulation;
+  min-height: 40px; display: flex; align-items: center; justify-content: center;
+}
+.gender-btn.active, .toggle-btn.active { background: var(--accent-dim); border-color: var(--accent); color: var(--accent); }
+
+/* Custom Multiselect Dropdown */
+.dropdown { position: relative; width: 100%; }
+.dropdown-btn {
+  background: var(--s2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px 10px; font-size: 14px; font-family: var(--sans); font-weight: 600;
+  border-radius: 6px; cursor: pointer; display: flex; justify-content: space-between; align-items: center;
+  width: 100%; min-height: 40px; text-align: right; transition: 0.2s;
+}
+.dropdown-btn::after { content: '▼'; font-size: 10px; color: var(--dim); transition: transform 0.2s; }
+.dropdown.open .dropdown-btn { border-color: var(--accent); }
+.dropdown.open .dropdown-btn::after { transform: rotate(180deg); color: var(--accent); }
+.dropdown-content {
+  display: none; position: absolute; top: 100%; left: 0; right: 0; z-index: 20;
+  background: var(--s1); border: 1px solid var(--border); border-radius: 6px;
+  margin-top: 4px; box-shadow: 0 8px 24px rgba(0,0,0,0.5); overflow: hidden;
+}
+.dropdown.open .dropdown-content { display: block; animation: fadeIn 0.15s ease; }
+@keyframes fadeIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: translateY(0); } }
+
+.sector-option {
+  padding: 12px; display: flex; align-items: center; gap: 10px; cursor: pointer;
+  border-bottom: 1px solid rgba(255,255,255,0.03); transition: 0.15s;
+}
+.sector-option:last-child { border-bottom: none; }
+.sector-option:hover { background: rgba(255,255,255,0.03); }
+.sector-cb {
+  width: 18px; height: 18px; border-radius: 4px; border: 1px solid var(--dim);
+  display: flex; align-items: center; justify-content: center; background: var(--s2); transition: 0.2s;
+}
+.sector-cb::after { content: '✓'; color: #000; font-size: 12px; opacity: 0; font-weight: bold; transform: scale(0.5); transition: 0.2s; }
+.sector-option.selected .sector-cb { background: var(--accent); border-color: var(--accent); }
+.sector-option.selected .sector-cb::after { opacity: 1; transform: scale(1); }
+.sector-name { font-size: 14px; font-weight: 600; color: var(--text); }
+
+.threshold-input {
+  width: 50px; text-align: center; background: var(--s2); border: 1px solid var(--border);
+  color: var(--text); border-radius: 6px; font-size: 14px; min-height: 40px;
+}
+.threshold-input.active { border-color: var(--accent); color: var(--accent); font-weight: 700; opacity: 1; }
+
+.length-row { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-bottom: 4px; }
+.length-label { font-size: 10px; color: var(--dim); font-weight: 600; white-space: nowrap; }
+.length-options { display: flex; flex-wrap: wrap; gap: 4px; }
+.len-btn {
+  min-width: 34px; height: 34px; padding: 0 6px;
+  display: flex; align-items: center; justify-content: center;
+  background: var(--s2); border: 1px solid var(--border); color: var(--dim);
+  cursor: pointer; font-size: 13px; font-weight: 700; border-radius: 6px;
+}
+.len-btn.active { background: var(--accent); color: #000; border-color: var(--accent); }
+
+.divider { height: 1px; background: rgba(255,255,255,0.03); margin: 8px 0; }
+
+.filter-add {
+  display: grid;
+  grid-template-columns: 1fr 60px 44px;
+  gap: 6px;
+}
+.filter-type-select { grid-column: 1 / -1; margin-bottom: 4px; }
+
+.filter-input {
+  background: var(--s2); border: 1px solid var(--border); color: var(--text);
+  padding: 8px; font-size: 14px; border-radius: 6px; min-height: 40px; width: 100%;
+}
+.filter-input.letter-input { font-size: 18px; text-align: center; font-weight: 700; }
+.btn-add {
+  background: var(--accent-dim); border: 1px solid var(--accent); color: var(--accent);
+  min-height: 40px; font-size: 22px; cursor: pointer; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+}
+
+.filter-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+.chip {
+  background: var(--s2); border: 1px solid var(--border);
+  padding: 4px 8px; font-size: 12px; border-radius: 6px;
+  display: flex; align-items: center; gap: 5px; border-right: 2px solid var(--accent);
+}
+.chip-excludes { border-right-color: var(--dim); opacity: 0.7; }
+.chip .chip-x { color: var(--dim); cursor: pointer; font-size: 18px; min-width: 20px; text-align: center; }
+
+.count-display { text-align: center; padding: 4px 0; }
+.count-num { font-family: var(--title-font); font-size: 48px; color: var(--accent); line-height: 1; font-weight: 500; }
+@media (min-width: 400px) { .count-num { font-size: 58px; } }
+
+.name-list {
+  display: flex; flex-direction: column; gap: 4px;
+  max-height: 220px; overflow-y: auto; overflow-x: hidden;
+  padding: 0 2px;
+}
+.name-item {
+  display: flex; align-items: center; gap: 6px;
+  padding: 6px 10px; background: var(--s2); border-radius: 6px;
+  cursor: pointer; border: 1px solid transparent; min-height: 38px;
+  transition: 0.15s;
+}
+.name-item:active { border-color: var(--accent); transform: scale(0.98); }
+.name-text {
+  font-size: 15px; font-weight: 700; flex: 0 1 auto; min-width: 0;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.name-bar-wrap { flex: 1 1 20px; height: 2px; background: rgba(255,255,255,0.05); border-radius: 1px; overflow: hidden; }
+.name-bar { height: 100%; background: var(--accent); border-radius: 1px; transition: width 0.4s; opacity: 0.8; }
+.name-prob { font-weight: 700; font-size: 10px; color: var(--dim); direction: ltr; min-width: 32px; text-align: right; }
+.name-search-icon { font-size: 10px; opacity: 0.4; }
+
+.two-names { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; padding: 6px 0; }
+.two-name-item {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 12px 6px; text-align: center; cursor: pointer; display: flex; flex-direction: column;
+}
+.two-name-text { font-size: 22px; font-weight: 700; color: var(--text); }
+.one-name { text-align: center; padding: 15px 0; cursor: pointer; }
+.one-name-text { font-size: 42px; font-weight: 700; color: var(--accent); text-shadow: 0 0 15px rgba(212,175,55,0.2); }
+
+.suggestion-list { display: flex; flex-direction: column; gap: 6px; }
+.suggestion {
+  background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
+  padding: 10px 12px; border-right: 3px solid var(--border);
+}
+.suggestion-q { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
+.suggestion-actions { display: flex; gap: 6px; margin-bottom: 6px; }
+.sugg-btn {
+  flex: 1; padding: 8px 6px; font-size: 13px; font-weight: 700;
+  cursor: pointer; border-radius: 6px; border: 1px solid transparent; 
+  display: flex; justify-content: space-between; align-items: center; min-height: 42px;
+}
+.sugg-btn.yes { background: rgba(104, 184, 158, 0.08); color: var(--green); border-color: rgba(104, 184, 158, 0.15); }
+.sugg-btn.no  { background: rgba(225, 107, 118, 0.08); color: var(--red);   border-color: rgba(225, 107, 118, 0.15); }
+.sugg-stats { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.1; }
+.sugg-pct { font-size: 13px; font-weight: 700; }
+.sugg-n { font-size: 9px; opacity: 0.5; }
+
+.suggestion-bar { height: 3px; background: rgba(255,255,255,0.05); margin: 5px 0; border-radius: 1px; overflow: hidden; }
+.suggestion-bar-fill { height: 100%; border-radius: 1px; transition: width 0.4s ease; background: var(--accent); opacity: 0.7; }
+.suggestion-risk { font-size: 9px; font-weight: 700; opacity: 0.8; }
+
+.btn-reset {
+  background: transparent; border: 1px solid var(--border); color: var(--dim);
+  padding: 10px; font-size: 10px; font-weight: 700; letter-spacing: 2px;
+  cursor: pointer; border-radius: 8px; width: 100%; min-height: 44px; margin-bottom: var(--safe-bottom);
+}
+.empty-state { font-size: 12px; padding: 10px; color: var(--dim); text-align: center; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-container">
+    <div class="logo">EIDETIC</div>
+    <div class="logo-sub">Intuition Engine</div>
+  </div>
+  <div class="version" id="app-version"></div>
+</header>
+
+<div id="db-generator" class="main" style="display:none;align-items:center;justify-content:center;text-align:center;">
+  <div class="card" style="width:100%;">
+    <h2 style="color:var(--accent);margin-bottom:12px;font-size:18px;">DB Initializing v13</h2>
+    <p id="init-status" style="color:var(--red);margin-bottom:15px;font-size:14px;">נדרש עדכון מבנה. אנא טען קובץ names.csv שוב:</p>
+    <input type="file" id="csv-file" accept=".csv">
+    <button style="background:var(--accent);color:#000;padding:12px;width:100%;border:none;border-radius:8px;font-weight:700" onclick="document.getElementById('csv-file').click()">טען קובץ</button>
+  </div>
+</div>
+
+<div id="app-main" class="main">
+  <div class="card">
+    <div class="card-title">פרטי יעד</div>
+    
+    <div class="setup-row">
+      <div class="field">
+        <label>גיל</label>
+        <input type="number" id="age-input" placeholder="32" inputmode="numeric">
+      </div>
+      <div class="field">
+        <label>מגדר</label>
+        <div class="gender-toggle">
+          <div class="gender-btn" data-g="m" onclick="setGender('m')">זכר</div>
+          <div class="gender-btn" data-g="f" onclick="setGender('f')">נקבה</div>
+          <div class="gender-btn active" data-g="u" onclick="setGender('u')">שניהם</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top: 8px;">
+      <label>מגזר</label>
+      <div class="dropdown" id="sector-dropdown">
+        <div class="dropdown-btn" onclick="toggleDropdown(event, 'sector-dropdown')">
+          <span id="sector-dropdown-btn-text">כל המגזרים (4)</span>
+        </div>
+        <div class="dropdown-content">
+          <div class="sector-option selected" data-sec="Jewish" onclick="toggleSector('Jewish', event)">
+            <div class="sector-cb"></div><div class="sector-name">יהודי</div>
+          </div>
+          <div class="sector-option selected" data-sec="Muslim" onclick="toggleSector('Muslim', event)">
+            <div class="sector-cb"></div><div class="sector-name">מוסלמי</div>
+          </div>
+          <div class="sector-option selected" data-sec="Druze" onclick="toggleSector('Druze', event)">
+            <div class="sector-cb"></div><div class="sector-name">דרוזי</div>
+          </div>
+          <div class="sector-option selected" data-sec="Christian" onclick="toggleSector('Christian', event)">
+            <div class="sector-cb"></div><div class="sector-name">נוצרי</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="field" style="margin-top: 8px;">
+      <label>תפוצה (לידות בשנה)</label>
+      <div style="display:flex;gap:4px;">
+        <div class="toggle-btn" id="common-btn" onclick="toggleCommon()" style="flex:1;">ללא סינון</div>
+        <input type="number" id="common-threshold" class="threshold-input" value="50" disabled inputmode="numeric" oninput="if(state.commonOnly) requestUpdateBaseNames()">
+      </div>
+    </div>
+    
+  </div>
+
+  <div class="card">
+    <div class="card-title">מידע קיים</div>
+    <div class="length-row">
+      <div class="length-label">אורך:</div>
+      <div class="length-options" id="length-options">
+        <div class="len-btn active" data-len="0">הכל</div>
+      </div>
+    </div>
+    <div class="divider"></div>
+    <div class="filter-controls">
+      <div class="filter-add">
+        <select id="filter-type" class="filter-input filter-type-select" onchange="handleTypeChange()">
+          <option value="exact">אות במיקום</option>
+          <option value="exact_excludes">אין אות במיקום</option>
+          <option value="includes">מכיל את האות</option>
+          <option value="excludes">לא מכיל את האות</option>
+          <option value="repeat_letter">אות חוזרת (כמות)</option>
+        </select>
+        <input type="text" id="letter-input" class="filter-input letter-input" placeholder="א" maxlength="1">
+        <input type="number" id="pos-input" class="filter-input" placeholder="מיקום" inputmode="numeric">
+        <div class="btn-add" onclick="addLetterFilter()">+</div>
+      </div>
+    </div>
+    <div class="filter-chips" id="filter-chips"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">אפשרויות סופיות</div>
+    <div class="count-display">
+      <div class="count-num" id="count-num">—</div>
+    </div>
+    <div id="name-list-wrapper"></div>
+  </div>
+
+  <div class="card">
+    <div class="card-title">מנוע אנטרופיה</div>
+    <div class="suggestion-list" id="suggestion-list"></div>
+  </div>
+
+  <button class="btn-reset" onclick="resetAll()">⟳ איפוס תודעה</button>
+</div>
+
+<script>
+const APP_VERSION = 'v3.0 Refactored';
+let DB = [];
+let state = { 
+  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: false,
+  sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true } 
+};
+let baseNames = [], filteredNames = [];
+
+const escapeHTML = s => s.replace(/[&<>'"]/g, t=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
+const countLetter = (str, letter) => str.split(letter).length - 1;
+const searchName = name => window.open('https://www.google.com/search?q='+encodeURIComponent(name),'_blank');
+
+// ── Dropdown Handlers ──
+function toggleDropdown(e, id) {
+  e.stopPropagation();
+  document.getElementById(id).classList.toggle('open');
+}
+document.addEventListener('click', e => {
+  if (!e.target.closest('.dropdown')) {
+      document.querySelectorAll('.dropdown').forEach(d => d.classList.remove('open'));
+  }
+});
+
+// ── IndexedDB (v13 for nested sectors) ──────────────────────────────
+const dbName="EideticDB", storeName="namesStore";
+function initDB() {
+  return new Promise((res,rej)=>{
+    const r=indexedDB.open(dbName, 13);
+    r.onupgradeneeded=e=>{const db=e.target.result;if(db.objectStoreNames.contains(storeName))db.deleteObjectStore(storeName);db.createObjectStore(storeName);};
+    r.onsuccess=e=>res(e.target.result);
+  });
+}
+async function loadNamesFromDB(){try{const db=await initDB();return new Promise((res)=>{const r=db.transaction([storeName],'readonly').objectStore(storeName).get("namesArray");r.onsuccess=e=>res(e.target.result);});}catch{return null;}}
+async function saveNamesToDB(arr){const db=await initDB();return new Promise((res)=>{const r=db.transaction([storeName],'readwrite').objectStore(storeName).put(arr,"namesArray");r.onsuccess=res;});}
+
+window.onload=async function(){
+  document.getElementById('app-version').innerText=APP_VERSION;
+  startAppHandlers();
+  const saved=await loadNamesFromDB();
+  if(saved&&saved.length>0){DB=saved;refreshBaseNames();}else attemptAutoLoad();
+};
+
+function startAppHandlers(){
+  document.getElementById('age-input').addEventListener('input',function(){
+    const v=parseInt(this.value);state.age=isNaN(v)||v<1?null:v;requestUpdateBaseNames();
+  });
+  
+  document.getElementById('app-main').addEventListener('click', e => {
+    const item = e.target.closest('[data-name]');
+    if (item) searchName(item.dataset.name);
+  });
+
+  document.getElementById('suggestion-list').addEventListener('click',e=>{
+    const b=e.target.closest('.sugg-btn');
+    if(b)applySuggestion(b.dataset.type,b.dataset.yes==='true',parseInt(b.dataset.val)||0,b.dataset.letter||'');
+  });
+  document.getElementById('filter-chips').addEventListener('click',e=>{
+    const x=e.target.closest('.chip-x');if(x)removeFilter(parseInt(x.dataset.index));
+  });
+  document.getElementById('length-options').addEventListener('click',e=>{
+    const b=e.target.closest('.len-btn');if(b&&!b.classList.contains('disabled'))setLength(parseInt(b.dataset.len));
+  });
+  handleTypeChange();
+}
+
+function handleTypeChange(){
+  const type=document.getElementById('filter-type').value;
+  const pEl=document.getElementById('pos-input');
+  pEl.disabled = (type==='includes' || type==='excludes');
+  pEl.placeholder = (type==='repeat_letter') ? 'כמות' : 'מיקום';
+}
+
+function setGender(g){state.gender=g;document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g===g));requestUpdateBaseNames();}
+function toggleCommon(){state.commonOnly=!state.commonOnly;syncUI();requestUpdateBaseNames();}
+function toggleSector(sec, event) {
+  if(event) event.stopPropagation(); // Keep dropdown open
+  state.sectors[sec] = !state.sectors[sec];
+  syncUI();
+  requestUpdateBaseNames();
+}
+
+function syncUI(){
+  const b=document.getElementById('common-btn'),i=document.getElementById('common-threshold');
+  b.classList.toggle('active',state.commonOnly); b.innerText=state.commonOnly?'נפוצים':'ללא סינון';
+  i.disabled=!state.commonOnly; i.classList.toggle('active',state.commonOnly);
+  
+  // Sync Sector Dropdown UI
+  const activeSectors = ['Jewish', 'Muslim', 'Christian', 'Druze'].filter(s => state.sectors[s]);
+  const btnText = document.getElementById('sector-dropdown-btn-text');
+  if (activeSectors.length === 4) btnText.innerText = 'כל המגזרים (4)';
+  else if (activeSectors.length === 0) btnText.innerText = 'לא נבחר מגזר';
+  else btnText.innerText = `${activeSectors.length} מגזרים מסומנים`;
+
+  ['Jewish', 'Muslim', 'Christian', 'Druze'].forEach(sec => {
+      const opt = document.querySelector(`.sector-option[data-sec="${sec}"]`);
+      if(opt) opt.classList.toggle('selected', state.sectors[sec]);
+  });
+}
+
+const cleanName=raw=>raw.replace(/[^א-תa-zA-Z\s\-\'׳]/g,'').replace(/^[\'׳\-]+|[\'׳\-]+$/g,'').trim();
+
+async function processCSVText(text){
+  const map=new Map(),lines=text.split('\n');
+  let isCBS=false,start=1,ig='u';const ycHeader={};
+  const hdr=lines.slice(0,5).join(' ');
+  if(hdr.includes('בנות'))ig='f'; else if(hdr.includes('בנים'))ig='m';
+
+  for(let i=0;i<Math.min(15,lines.length);i++){
+    const l=lines[i];
+    if(l.includes('sector')&&l.includes('name')){start=i+1;isCBS=false;break;}
+    if(l.includes('prati1')){start=i+1;isCBS=true;
+      l.split(',').forEach((h,j)=>{const yr=parseInt(h);if(!isNaN(yr))ycHeader[j]=yr;});
+      break;
+    }
+  }
+
+  for(let i=start;i<lines.length;i++){
+    const line=lines[i].trim();if(!line)continue;
+    const cols=line.split(',');
+    
+    if(isCBS){
+      const name=cleanName(cols[0]);if(!name||name.length<2)continue;
+      if(!map.has(name))map.set(name,{n:name,era:[2024,1949],s:{}});
+      const e=map.get(name);
+      
+      let sector = 'All'; // Fallback for old CSV style
+      if(!e.s[sector]) e.s[sector] = { m:0, f:0, ycM:{}, ycF:{} };
+
+      for(let j=2;j<cols.length;j++){
+        if(!ycHeader[j])continue;
+        const n=parseInt(cols[j].replace(/[^\d]/g,''))||0;
+        if(n>0){
+          e.era[0]=Math.min(e.era[0],ycHeader[j]);e.era[1]=Math.max(e.era[1],ycHeader[j]);
+          if(ig==='m'){e.s[sector].m+=n;e.s[sector].ycM[ycHeader[j]]=(e.s[sector].ycM[ycHeader[j]]||0)+n;}
+          else{e.s[sector].f+=n;e.s[sector].ycF[ycHeader[j]]=(e.s[sector].ycF[ycHeader[j]]||0)+n;}
+        }
+      }
+    }else{
+      const sectorRaw = cols[0].trim();
+      let sector = 'Other';
+      if(sectorRaw.includes('Jewish') || sectorRaw === 'יהודי') sector = 'Jewish';
+      else if(sectorRaw.includes('Muslim') || sectorRaw === 'מוסלמי') sector = 'Muslim';
+      else if(sectorRaw.includes('Christian') || sectorRaw === 'נוצרי') sector = 'Christian';
+      else if(sectorRaw.includes('Druze') || sectorRaw === 'דרוזי') sector = 'Druze';
+      else sector = 'All';
+
+      const year=parseInt(cols[1]),sex=cols[2]?.toLowerCase(),name=cleanName(cols[3]||''),n=parseInt(cols[4]);
+      if(!name||name.length<2||isNaN(n)||n<=0)continue;
+      if(!map.has(name))map.set(name,{n:name,era:[2024,1949],s:{}});
+      const e=map.get(name);
+      e.era[0]=Math.min(e.era[0],year);e.era[1]=Math.max(e.era[1],year);
+      
+      if(!e.s[sector]) e.s[sector] = { m:0, f:0, ycM:{}, ycF:{} };
+
+      if(sex==='m'){e.s[sector].m+=n;e.s[sector].ycM[year]=(e.s[sector].ycM[year]||0)+n;}
+      else{e.s[sector].f+=n;e.s[sector].ycF[year]=(e.s[sector].ycF[year]||0)+n;}
+    }
+  }
+  const arr=Array.from(map.values());
+  await saveNamesToDB(arr);DB=arr;
+}
+
+async function attemptAutoLoad(){
+  try{
+    const r=await fetch('names.csv');if(!r.ok)throw 0;
+    await processCSVText(await r.text());refreshBaseNames();
+  }catch{document.getElementById('app-main').style.display='none';document.getElementById('db-generator').style.display='flex';}
+}
+
+document.getElementById('csv-file').addEventListener('change',async e=>{
+  await processCSVText(await e.target.files[0].text());
+  document.getElementById('db-generator').style.display='none';
+  document.getElementById('app-main').style.display='flex';
+  refreshBaseNames();
+});
+
+let baseUpdateTimer;
+function requestUpdateBaseNames(){clearTimeout(baseUpdateTimer);baseUpdateTimer=setTimeout(refreshBaseNames,250);}
+
+// Dynamic Mass Calculator per Active Sectors & Year
+function calculateMass(nameObj, gender, birthYear){
+  let sum = 0;
+  for(const sName of Object.keys(nameObj.s)) {
+      if(sName !== 'All' && !state.sectors[sName]) continue;
+      const sData = nameObj.s[sName];
+      if(birthYear === null){
+          if(gender==='m'||gender==='u') sum += sData.m;
+          if(gender==='f'||gender==='u') sum += sData.f;
+      } else {
+          for(let y=birthYear-5; y<=birthYear+5; y++){
+              if(gender==='m'||gender==='u') sum += (sData.ycM[y]||0);
+              if(gender==='f'||gender==='u') sum += (sData.ycF[y]||0);
+          }
+      }
+  }
+  return sum;
+}
+
+function refreshBaseNames(){
+  const {age, gender, commonOnly}=state;
+  const birthYear = age ? Math.min(2024, 2026 - age) : null;
+  state.birthYear = birthYear;
+  
+  const threshold=parseInt(document.getElementById('common-threshold').value)|| 50;
+  
+  // Map and cache mass for incredible performance boost
+  baseNames=DB.map(name => {
+      name._mass = calculateMass(name, gender, birthYear);
+      return name;
+  }).filter(name=>{
+    if(name._mass <= 0) return false;
+    if(birthYear!==null && (birthYear<name.era[0]-5 || birthYear>name.era[1]+5)) return false;
+    
+    if(commonOnly){
+      let isCommon = false;
+      if(birthYear!==null){
+        let mx=0;
+        for(let y=birthYear-5;y<=birthYear+5;y++){
+          let ycSum = 0;
+          for(const sName of Object.keys(name.s)){
+             if(sName !== 'All' && !state.sectors[sName]) continue;
+             if(gender==='m'||gender==='u') ycSum += (name.s[sName].ycM[y]||0);
+             if(gender==='f'||gender==='u') ycSum += (name.s[sName].ycF[y]||0);
+          }
+          if(ycSum > mx) mx = ycSum;
+        }
+        if(mx>=threshold) isCommon = true;
+      } else if(name._mass/Math.max(1,name.era[1]-name.era[0]+1)>=threshold) {
+          isCommon = true;
+      }
+      if(!isCommon) return false;
+    }
+    return true;
+  });
+  update();
+}
+
+function addLetterFilter(){
+  const type=document.getElementById('filter-type').value;
+  const lEl=document.getElementById('letter-input'), pEl=document.getElementById('pos-input');
+  const letter=lEl.value.trim(), pos=parseInt(pEl.value);
+  if(type!=='repeat_letter' && letter.length!==1)return;
+  state.filters.push({type,letter,pos:isNaN(pos)?0:pos});
+  lEl.value=''; pEl.value=''; update();
+}
+
+function removeFilter(i){state.filters.splice(i,1);update();}
+function setLength(l){state.length=l;update();}
+
+const hasAnyRepeat = (name, threshold) => {
+  const counts = {};
+  for (const char of name) {
+    counts[char] = (counts[char] || 0) + 1;
+    if (counts[char] >= threshold) return true;
+  }
+  return false;
+};
+
+function applyFilters(names){
+  let r=[...names];
+  if(state.length>0)r=r.filter(n=>n.n.length===state.length);
+  state.filters.forEach(f=>{
+    if(f.type==='length_excludes')r=r.filter(n=>n.n.length!==f.val); // Filter length out
+    if(f.type==='exact')r=f.pos===0?r.filter(n=>n.n.endsWith(f.letter)):r.filter(n=>n.n[f.pos-1]===f.letter);
+    if(f.type==='exact_excludes')r=f.pos===0?r.filter(n=>!n.n.endsWith(f.letter)):r.filter(n=>n.n[f.pos-1]!==f.letter);
+    if(f.type==='includes')r=r.filter(n=>n.n.includes(f.letter));
+    if(f.type==='excludes')r=r.filter(n=>!n.n.includes(f.letter));
+    if(f.type==='repeat_letter'){
+        const thr = f.pos || 2;
+        if(f.letter) r=r.filter(n=>countLetter(n.n,f.letter)>=thr);
+        else r=r.filter(n=>hasAnyRepeat(n.n, thr));
+    }
+    if(f.type==='has_repeat') r=r.filter(n=>new Set(n.n).size < n.n.length);
+    if(f.type==='no_repeat') r=r.filter(n=>new Set(n.n).size === n.n.length);
+  });
+  return r;
+}
+
+const POS_LABELS = ['ראשונה','שנייה','שלישית','רביעית','חמישית','שישית'];
+
+function getSuggestions(names){
+  if(names.length<=1)return[];
+  const total=names.length, tMass=names.reduce((a,n)=>a+n._mass,0)||1, sugg=[];
+
+  if(state.length === 0){
+    const lens = {}; names.forEach(n=>lens[n.n.length]=(lens[n.n.length]||0)+n._mass);
+    Object.entries(lens).forEach(([l, mass])=>{
+      const pY = mass/tMass;
+      if(pY > 0.05 && pY < 0.95)
+        sugg.push({q:`השם בן ${l} אותיות?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'length', val:parseInt(l)});
+    });
+  }
+
+  const alreadyHasRepeatFilter = state.filters.some(f=>f.type==='has_repeat'||f.type==='no_repeat');
+  if(!alreadyHasRepeatFilter){
+    const repeatNames = names.filter(n=>new Set(n.n).size < n.n.length);
+    const repeatMass = repeatNames.reduce((a,n)=>a+n._mass,0);
+    const pY = repeatMass/tMass;
+    if(pY > 0.1 && pY < 0.9)
+      sugg.push({q:'האם יש בשם אות שחוזרת על עצמה?', probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'repeat_general'});
+  }
+
+  const ac=new Set(names.flatMap(n=>n.n.split('')));
+  ac.forEach(letter=>{
+    const alreadyFiltered = state.filters.some(f=>(f.letter===letter && (f.type==='includes'||f.type==='excludes')));
+    if(alreadyFiltered) return;
+
+    let yC=0, yM=0;
+    names.forEach(n=>{if(n.n.includes(letter)){yC++;yM+=n._mass;}});
+    if(yC>0&&yC<total){
+      const pY=yM/tMass;
+      sugg.push({q:`האם יש בשם את האות "${escapeHTML(letter)}"?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'includes', letter});
+    }
+  });
+
+  if(total < 100){
+    for(let pos=0; pos<6; pos++){
+      const lettersAtPos = {};
+      names.forEach(n=>{if(n.n[pos]) lettersAtPos[n.n[pos]]=(lettersAtPos[n.n[pos]]||0)+n._mass});
+      Object.entries(lettersAtPos).forEach(([l, mass])=>{
+        const pY = mass/tMass;
+        if(pY > 0.15 && pY < 0.85)
+          sugg.push({q:`האות ה${POS_LABELS[pos]} היא "${escapeHTML(l)}"?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'exact', pos:pos+1, letter:l});
+      });
+    }
+  }
+
+  return sugg.sort((a,b)=>b.balance-a.balance).slice(0,4);
+}
+
+function applySuggestion(type,isYes,vp,letter){
+  if(type==='length') {
+    if(isYes) setLength(vp); else state.filters.push({type:'length_excludes', val:vp});
+  } else if(type==='repeat_general'){
+    state.filters.push({type:isYes?'has_repeat':'no_repeat'});
+  } else if(type==='exact'){
+    state.filters.push({type:isYes?'exact':'exact_excludes', pos:vp, letter});
+  } else {
+    state.filters.push({type:isYes?'includes':'excludes', letter});
+  }
+  update();
+}
+
+function update(){
+  if(!DB.length)return;
+  filteredNames=applyFilters(baseNames);
+  renderAll();
+}
+
+function renderAll(){
+  document.getElementById('count-num').textContent=filteredNames.length;
+  renderLengthOptions();
+  renderChips();
+  renderNames();
+  renderSuggestions();
+}
+
+function renderLengthOptions(){
+  const lc={};baseNames.forEach(n=>lc[n.n.length]=(lc[n.n.length]||0)+1);
+  const lens=Object.keys(lc).map(Number).sort((a,b)=>a-b);
+  let html=`<div class="len-btn${state.length===0?' active':''}" data-len="0">הכל</div>`;
+  lens.forEach(l=>html+=`<div class="len-btn${state.length===l?' active':''}" data-len="${l}">${l}</div>`);
+  document.getElementById('length-options').innerHTML=html;
+}
+
+function renderChips(){
+  document.getElementById('filter-chips').innerHTML=state.filters.map((f,i)=>{
+    let cls = f.type.includes('excl') || f.type==='no_repeat' ? 'chip-excludes' : '';
+    let label = f.letter || (f.type==='has_repeat'?'יש אות חוזרת':(f.type==='no_repeat'?'אין אות חוזרת':(f.type==='length_excludes'?'לא '+f.val+' אותיות':'')));
+    if(f.type==='repeat_letter') label = (f.letter||'כלשהי') + ' ×' + (f.pos||2);
+    if(f.type==='exact') label = 'מ'+f.pos+': '+f.letter;
+    if(f.type==='exact_excludes') label = 'לא מ'+f.pos+': '+f.letter;
+    return `<div class="chip ${cls}">${label}<span class="chip-x" data-index="${i}">×</span></div>`;
+  }).join('');
+}
+
+function renderNames(){
+  const wrapper=document.getElementById('name-list-wrapper');
+  if(!filteredNames.length){wrapper.innerHTML='<div class="empty-state">אין התאמות</div>';return;}
+  
+  const sorted=[...filteredNames].sort((a,b)=>b._mass - a._mass);
+  const sumN=sorted.reduce((a,n)=>a+n._mass,0)||1;
+  const maxN=sorted[0]._mass||1;
+
+  if(sorted.length===1){
+    wrapper.innerHTML=`<div class="one-name" data-name="${escapeHTML(sorted[0].n)}"><div class="one-name-text">${escapeHTML(sorted[0].n)}</div><div style="font-size:12px; color:var(--accent)">לחץ לחיפוש בגוגל</div></div>`;
+  } else {
+    wrapper.innerHTML=`<div class="name-list">${sorted.slice(0,50).map(n=>{
+      const mass = n._mass;
+      return `<div class="name-item" data-name="${escapeHTML(n.n)}">
+        <span class="name-text">${escapeHTML(n.n)}</span>
+        <div class="name-bar-wrap"><div class="name-bar" style="width:${mass/maxN*100}%"></div></div>
+        <span class="name-prob">${(mass/sumN*100).toFixed(0)}%</span>
+        <span class="name-search-icon">🔍</span>
+      </div>`;
+    }).join('')}</div>`;
+  }
+}
+
+function renderSuggestions(){
+  const sugg=getSuggestions(filteredNames);
+  document.getElementById('suggestion-list').innerHTML=sugg.length ? sugg.map(s=>`
+    <div class="suggestion">
+      <div class="suggestion-q">${s.q}</div>
+      <div class="suggestion-actions">
+        <button class="sugg-btn yes" data-type="${s.type}" data-yes="true" data-letter="${s.letter||''}" data-val="${s.val||s.pos||0}">
+          <span>כן</span><span>${(s.probYes*100).toFixed(0)}%</span>
+        </button>
+        <button class="sugg-btn no" data-type="${s.type}" data-yes="false" data-letter="${s.letter||''}" data-val="${s.val||s.pos||0}">
+          <span>לא</span><span>${((1-s.probYes)*100).toFixed(0)}%</span>
+        </button>
+      </div>
+      <div class="suggestion-bar"><div class="suggestion-bar-fill" style="width:${s.probYes*100}%"></div></div>
+    </div>`).join('') : '<div class="empty-state">אין הצעות נוספות</div>';
+}
+
+function resetAll(){
+  state={
+    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:state.commonOnly,
+    sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true }
+  };
+  document.getElementById('age-input').value='';
+  document.getElementById('common-threshold').value='50';
+  document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g==='u'));
+  syncUI(); refreshBaseNames();
+}
+</script>
+</body>
+</html>
