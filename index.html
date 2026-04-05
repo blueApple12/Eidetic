@@ -283,19 +283,19 @@ header {
       <label>מגזר</label>
       <div class="dropdown" id="sector-dropdown">
         <div class="dropdown-btn" onclick="toggleDropdown(event, 'sector-dropdown')">
-          <span id="sector-dropdown-btn-text">כל המגזרים (4)</span>
+          <span id="sector-dropdown-btn-text">יהודי</span>
         </div>
         <div class="dropdown-content">
           <div class="sector-option selected" data-sec="Jewish" onclick="toggleSector('Jewish', event)">
             <div class="sector-cb"></div><div class="sector-name">יהודי</div>
           </div>
-          <div class="sector-option selected" data-sec="Muslim" onclick="toggleSector('Muslim', event)">
+          <div class="sector-option" data-sec="Muslim" onclick="toggleSector('Muslim', event)">
             <div class="sector-cb"></div><div class="sector-name">מוסלמי</div>
           </div>
-          <div class="sector-option selected" data-sec="Druze" onclick="toggleSector('Druze', event)">
+          <div class="sector-option" data-sec="Druze" onclick="toggleSector('Druze', event)">
             <div class="sector-cb"></div><div class="sector-name">דרוזי</div>
           </div>
-          <div class="sector-option selected" data-sec="Christian" onclick="toggleSector('Christian', event)">
+          <div class="sector-option" data-sec="Christian" onclick="toggleSector('Christian', event)">
             <div class="sector-cb"></div><div class="sector-name">נוצרי</div>
           </div>
         </div>
@@ -361,8 +361,8 @@ header {
 const APP_VERSION = 'v3.1 Positional';
 let DB = [];
 let state = { 
-  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: false,
-  sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true } 
+  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true,
+  sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true } 
 };
 let baseNames = [], filteredNames = [];
 
@@ -465,6 +465,7 @@ function syncUI(){
   const btnText = document.getElementById('sector-dropdown-btn-text');
   if (activeSectors.length === 4) btnText.innerText = 'כל המגזרים (4)';
   else if (activeSectors.length === 0) btnText.innerText = 'לא נבחר מגזר';
+  else if (activeSectors.length === 1) btnText.innerText = ['Jewish','Muslim','Christian','Druze'].reduce((a,s)=>state.sectors[s]?({'Jewish':'יהודי','Muslim':'מוסלמי','Christian':'נוצרי','Druze':'דרוזי'}[s]):a,'');
   else btnText.innerText = `${activeSectors.length} מגזרים מסומנים`;
 
   ['Jewish', 'Muslim', 'Christian', 'Druze'].forEach(sec => {
@@ -923,8 +924,8 @@ function renderSuggestions(){
 
 function resetAll(){
   state={
-    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:state.commonOnly,
-    sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true }
+    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:true,
+    sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true }
   };
   document.getElementById('age-input').value='';
   document.getElementById('common-threshold').value='50';
