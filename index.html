@@ -331,7 +331,7 @@ header {
           <option value="repeat_letter">אות חוזרת (כמות)</option>
         </select>
         <input type="text" id="letter-input" class="filter-input letter-input" placeholder="א" maxlength="1">
-        <input type="number" id="pos-input" class="filter-input" placeholder="מיקום" inputmode="numeric">
+        <input type="number" id="pos-input" class="filter-input" placeholder="מיקום" inputmode="numeric" title="מיקום">
         <div class="btn-add" onclick="addLetterFilter()">+</div>
       </div>
     </div>
@@ -434,8 +434,11 @@ function startAppHandlers(){
 function handleTypeChange(){
   const type=document.getElementById('filter-type').value;
   const pEl=document.getElementById('pos-input');
-  pEl.disabled = (type==='includes' || type==='excludes');
-  pEl.placeholder = (type==='repeat_letter') ? 'כמות' : 'מיקום';
+  const isRepeat = type === 'repeat_letter';
+  const noPos = type === 'includes' || type === 'excludes';
+  pEl.disabled = noPos;
+  pEl.placeholder = isRepeat ? 'כמות' : 'מיקום';
+  pEl.title = isRepeat ? 'כמות חזרות' : 'מיקום האות בשם';
 }
 
 function setGender(g){state.gender=g;document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g===g));requestUpdateBaseNames();}
@@ -605,8 +608,35 @@ function addLetterFilter(){
   const lEl=document.getElementById('letter-input'), pEl=document.getElementById('pos-input');
   const letter=lEl.value.trim(), pos=parseInt(pEl.value);
   if(type!=='repeat_letter' && letter.length!==1)return;
-  state.filters.push({type,letter,pos:isNaN(pos)?0:pos});
+  const resolvedPos = isNaN(pos) ? 0 : pos;
+  // Bake the human-readable label now, while state.length is current
+  let chipLabel = letter;
+  if(type==='repeat_letter') chipLabel = (letter||'כלשהי') + ' ×' + (resolvedPos||2);
+  if(type==='exact') chipLabel = posLabel(resolvedPos, state.length) + ': ' + letter;
+  if(type==='exact_excludes') chipLabel = 'לא ' + posLabel(resolvedPos, state.length) + ': ' + letter;
+  state.filters.push({type, letter, pos: resolvedPos, chipLabel});
   lEl.value=''; pEl.value=''; update();
+}
+
+function applySuggestion(type, isYes, vp, letter){
+  // Bake chip label at creation time
+  let chipLabel = letter;
+  if(type==='exact') {
+    const finalType = isYes ? 'exact' : 'exact_excludes';
+    chipLabel = (isYes ? '' : 'לא ') + posLabel(vp, state.length) + ': ' + letter;
+    state.filters.push({type: finalType, pos: vp, letter, chipLabel});
+  } else if(type==='length') {
+    if(isYes) { setLength(vp); return; }
+    else state.filters.push({type:'length_excludes', val:vp, chipLabel:'לא '+vp+' אותיות'});
+  } else if(type==='repeat_general') {
+    const finalType = isYes ? 'has_repeat' : 'no_repeat';
+    state.filters.push({type: finalType, chipLabel: isYes ? 'יש אות חוזרת' : 'אין אות חוזרת'});
+  } else {
+    // includes / excludes
+    const finalType = isYes ? 'includes' : 'excludes';
+    state.filters.push({type: finalType, letter, chipLabel: letter});
+  }
+  update();
 }
 
 function removeFilter(i){state.filters.splice(i,1);update();}
@@ -720,7 +750,7 @@ function getSuggestions(names){
 
   // ── TIER 2: Inner positional letters (pos 2 … length-1) ────────
   // Only when we know the exact length; skip first and last (covered above).
-  if (knownLen > 2 && total < 200) {
+  if (knownLen > 2) {
     for (let pos = 2; pos < knownLen; pos++) {
       const alreadyDone = state.filters.some(f => f.type === 'exact' && f.pos === pos);
       if (alreadyDone) continue;
@@ -795,12 +825,11 @@ function getSuggestions(names){
   const pruned = sugg.filter(s => !toRemove.has(s));
 
   // ── Sort: balance is primary (closest to 50% wins).
-  //    Within a 5% tolerance band, prefer higher tier (more specific).
-  const BAND = 0.10; // 5% on each side = 0.10 balance units
+  //    If two questions are within 5% probability of each other,
+  //    prefer the more specific one (higher tier) instead.
+  const TOLERANCE = 0.10; // 5% on each side = 0.10 balance difference
   pruned.sort((a, b) => {
-    const bandA = Math.floor(a.balance / BAND);
-    const bandB = Math.floor(b.balance / BAND);
-    if (bandA !== bandB) return bandB - bandA;
+    if (Math.abs(a.balance - b.balance) > TOLERANCE) return b.balance - a.balance;
     return b.tier - a.tier;
   });
 
@@ -852,18 +881,9 @@ function renderLengthOptions(){
 
 function renderChips(){
   document.getElementById('filter-chips').innerHTML=state.filters.map((f,i)=>{
-    let cls = f.type.includes('excl') || f.type==='no_repeat' ? 'chip-excludes' : '';
-    let label = f.letter || (f.type==='has_repeat'?'יש אות חוזרת':(f.type==='no_repeat'?'אין אות חוזרת':(f.type==='length_excludes'?'לא '+f.val+' אותיות':'')));
-    if(f.type==='repeat_letter') label = (f.letter||'כלשהי') + ' ×' + (f.pos||2);
-    if(f.type==='exact') {
-      const lbl = posLabel(f.pos, state.length);
-      label = lbl + ': ' + f.letter;
-    }
-    if(f.type==='exact_excludes') {
-      const lbl = posLabel(f.pos, state.length);
-      label = 'לא ' + lbl + ': ' + f.letter;
-    }
-    return `<div class="chip ${cls}">${label}<span class="chip-x" data-index="${i}">×</span></div>`;
+    const cls = f.type.includes('excl') || f.type==='no_repeat' ? 'chip-excludes' : '';
+    const label = f.chipLabel || f.letter || '';
+    return `<div class="chip ${cls}">${escapeHTML(label)}<span class="chip-x" data-index="${i}">×</span></div>`;
   }).join('');
 }
 
@@ -896,10 +916,10 @@ function renderSuggestions(){
     <div class="suggestion${s.positional ? ' positional' : ''}">
       <div class="suggestion-q">${s.q}</div>
       <div class="suggestion-actions">
-        <button class="sugg-btn yes" data-type="${s.type}" data-yes="true" data-letter="${s.letter||''}" data-val="${s.val !== undefined ? s.val : 0}">
+        <button class="sugg-btn yes" data-type="${s.type}" data-yes="true" data-letter="${escapeHTML(s.letter||'')}" data-val="${s.val !== undefined ? s.val : 0}">
           <span>כן</span><span>${(s.probYes*100).toFixed(0)}%</span>
         </button>
-        <button class="sugg-btn no" data-type="${s.type}" data-yes="false" data-letter="${s.letter||''}" data-val="${s.val !== undefined ? s.val : 0}">
+        <button class="sugg-btn no" data-type="${s.type}" data-yes="false" data-letter="${escapeHTML(s.letter||'')}" data-val="${s.val !== undefined ? s.val : 0}">
           <span>לא</span><span>${((1-s.probYes)*100).toFixed(0)}%</span>
         </button>
       </div>
