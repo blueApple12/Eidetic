@@ -331,7 +331,10 @@ header {
           <option value="repeat_letter">אות חוזרת (כמות)</option>
         </select>
         <input type="text" id="letter-input" class="filter-input letter-input" placeholder="א" maxlength="1">
-        <input type="number" id="pos-input" class="filter-input" placeholder="מיקום" inputmode="numeric" title="מיקום">
+        <div style="display:flex;flex-direction:column;gap:2px;">
+          <label id="pos-label" style="font-size:9px;color:var(--dim);font-weight:600;text-align:center;">מיקום</label>
+          <input type="number" id="pos-input" class="filter-input" placeholder="מיקום" inputmode="numeric" title="מיקום" style="min-height:32px;">
+        </div>
         <div class="btn-add" onclick="addLetterFilter()">+</div>
       </div>
     </div>
@@ -434,11 +437,14 @@ function startAppHandlers(){
 function handleTypeChange(){
   const type=document.getElementById('filter-type').value;
   const pEl=document.getElementById('pos-input');
+  const lEl=document.getElementById('pos-label');
   const isRepeat = type === 'repeat_letter';
   const noPos = type === 'includes' || type === 'excludes';
   pEl.disabled = noPos;
-  pEl.placeholder = isRepeat ? 'כמות' : 'מיקום';
+  const txt = isRepeat ? 'כמות' : 'מיקום';
+  pEl.placeholder = txt;
   pEl.title = isRepeat ? 'כמות חזרות' : 'מיקום האות בשם';
+  lEl.textContent = txt;
 }
 
 function setGender(g){state.gender=g;document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g===g));requestUpdateBaseNames();}
@@ -556,7 +562,7 @@ function calculateMass(nameObj, gender, birthYear){
           if(gender==='m'||gender==='u') sum += sData.m;
           if(gender==='f'||gender==='u') sum += sData.f;
       } else {
-          for(let y=birthYear-5; y<=birthYear+5; y++){
+          for(let y=birthYear-2; y<=birthYear+2; y++){
               if(gender==='m'||gender==='u') sum += (sData.ycM[y]||0);
               if(gender==='f'||gender==='u') sum += (sData.ycF[y]||0);
           }
@@ -583,7 +589,7 @@ function refreshBaseNames(){
       let isCommon = false;
       if(birthYear!==null){
         let mx=0;
-        for(let y=birthYear-5;y<=birthYear+5;y++){
+        for(let y=birthYear-2;y<=birthYear+2;y++){
           let ycSum = 0;
           for(const sName of Object.keys(name.s)){
              if(sName !== 'All' && !state.sectors[sName]) continue;
@@ -842,19 +848,6 @@ function getSuggestions(names){
     if (deduped.length >= 5) break;
   }
   return deduped;
-}
-
-function applySuggestion(type, isYes, vp, letter){
-  if (type === 'length') {
-    if(isYes) setLength(vp); else state.filters.push({type:'length_excludes', val:vp});
-  } else if (type === 'repeat_general') {
-    state.filters.push({type: isYes ? 'has_repeat' : 'no_repeat'});
-  } else if (type === 'exact') {
-    state.filters.push({type: isYes ? 'exact' : 'exact_excludes', pos: vp, letter});
-  } else {
-    state.filters.push({type: isYes ? 'includes' : 'excludes', letter});
-  }
-  update();
 }
 
 function update(){
