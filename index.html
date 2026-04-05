@@ -361,8 +361,8 @@ header {
 const APP_VERSION = 'v3.1 Positional';
 let DB = [];
 let state = { 
-  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true, // <-- Change this to true
-  sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true } 
+  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true,
+  sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true } // <-- Change to this
 };
 let baseNames = [], filteredNames = [];
 
@@ -925,7 +925,7 @@ function renderSuggestions(){
 
 function resetAll(){
   state={
-    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:true,
+    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:state.commonOnly,
     sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true }
   };
   document.getElementById('age-input').value='';
