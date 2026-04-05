@@ -423,7 +423,7 @@ function startAppHandlers(){
 
   document.getElementById('suggestion-list').addEventListener('click',e=>{
     const b=e.target.closest('.sugg-btn');
-    if(b)applySuggestion(b.dataset.type,b.dataset.yes==='true',parseInt(b.dataset.val)||0,b.dataset.letter||'');
+    if(b)applySuggestion(b.dataset.type,b.dataset.yes==='true',parseInt(b.dataset.val)??0,b.dataset.letter||'');
   });
   document.getElementById('filter-chips').addEventListener('click',e=>{
     const x=e.target.closest('.chip-x');if(x)removeFilter(parseInt(x.dataset.index));
