@@ -773,14 +773,41 @@ function getSuggestions(names){
       sugg.push(makeSugg('האם יש בשם אות שחוזרת על עצמה?', pY, 'repeat_general', {}, 1));
   }
 
-  // ── Sort: tier desc, then balance desc; deduplicate by question ──
-  sugg.sort((a,b) => b.tier !== a.tier ? b.tier - a.tier : b.balance - a.balance);
+  // ── Semantic dedup: if ALL names containing letter X have it only at
+  //    position P, then "contains X" is redundant — drop it.
+  const containsSugg = sugg.filter(s => s.type === 'includes');
+  const toRemove = new Set();
+  containsSugg.forEach(cs => {
+    const letter = cs.letter;
+    const positionalForLetter = sugg.filter(s =>
+      s.positional && s.letter === letter && s.type === 'exact'
+    );
+    if (positionalForLetter.length === 0) return;
+    const namesWithLetter = names.filter(n => n.n.includes(letter));
+    const posSet = new Set(positionalForLetter.map(s => s.val));
+    const allCovered = namesWithLetter.every(n =>
+      [...posSet].some(pos =>
+        pos === 0 ? n.n.endsWith(letter) : n.n[pos - 1] === letter
+      )
+    );
+    if (allCovered) toRemove.add(cs);
+  });
+  const pruned = sugg.filter(s => !toRemove.has(s));
 
-  // Keep only the best question per unique (type+letter+val) combo,
-  // then return top 5 after dedup.
+  // ── Sort: balance is primary (closest to 50% wins).
+  //    Within a 5% tolerance band, prefer higher tier (more specific).
+  const BAND = 0.10; // 5% on each side = 0.10 balance units
+  pruned.sort((a, b) => {
+    const bandA = Math.floor(a.balance / BAND);
+    const bandB = Math.floor(b.balance / BAND);
+    if (bandA !== bandB) return bandB - bandA;
+    return b.tier - a.tier;
+  });
+
+  // Dedup by (type+letter+val), keep top 5
   const seen = new Set();
   const deduped = [];
-  for (const s of sugg) {
+  for (const s of pruned) {
     const key = `${s.type}|${s.letter||''}|${s.val||0}`;
     if (!seen.has(key)) { seen.add(key); deduped.push(s); }
     if (deduped.length >= 5) break;
