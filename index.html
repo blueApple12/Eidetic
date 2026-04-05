@@ -213,6 +213,9 @@ header {
   background: var(--s2); border: 1px solid var(--border); border-radius: 8px;
   padding: 10px 12px; border-right: 3px solid var(--border);
 }
+/* Positional questions get a subtle gold tint to signal they're high-value */
+.suggestion.positional { border-right-color: var(--accent); }
+
 .suggestion-q { font-size: 14px; font-weight: 700; margin-bottom: 8px; color: var(--text); }
 .suggestion-actions { display: flex; gap: 6px; margin-bottom: 6px; }
 .sugg-btn {
@@ -352,7 +355,7 @@ header {
 </div>
 
 <script>
-const APP_VERSION = 'v3.0 Refactored';
+const APP_VERSION = 'v3.1 Positional';
 let DB = [];
 let state = { 
   age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: false,
@@ -363,6 +366,17 @@ let baseNames = [], filteredNames = [];
 const escapeHTML = s => s.replace(/[&<>'"]/g, t=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
 const countLetter = (str, letter) => str.split(letter).length - 1;
 const searchName = name => window.open('https://www.google.com/search?q='+encodeURIComponent(name),'_blank');
+
+// Position label helper — returns "ראשונה", "אחרונה", or ordinal
+// pos is 1-based; knownLength is the fixed length (or 0 if unknown)
+function posLabel(pos, knownLength) {
+  if (pos === 1) return 'ראשונה';
+  if (knownLength > 0 && pos === knownLength) return 'אחרונה';
+  // pos === 0 means "last" in our convention for exact filter (endsWith)
+  if (pos === 0) return 'אחרונה';
+  const labels = ['','ראשונה','שנייה','שלישית','רביעית','חמישית','שישית','שביעית'];
+  return labels[pos] || `ה-${pos}`;
+}
 
 // ── Dropdown Handlers ──
 function toggleDropdown(e, id) {
@@ -427,7 +441,7 @@ function handleTypeChange(){
 function setGender(g){state.gender=g;document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g===g));requestUpdateBaseNames();}
 function toggleCommon(){state.commonOnly=!state.commonOnly;syncUI();requestUpdateBaseNames();}
 function toggleSector(sec, event) {
-  if(event) event.stopPropagation(); // Keep dropdown open
+  if(event) event.stopPropagation();
   state.sectors[sec] = !state.sectors[sec];
   syncUI();
   requestUpdateBaseNames();
@@ -438,7 +452,6 @@ function syncUI(){
   b.classList.toggle('active',state.commonOnly); b.innerText=state.commonOnly?'נפוצים':'ללא סינון';
   i.disabled=!state.commonOnly; i.classList.toggle('active',state.commonOnly);
   
-  // Sync Sector Dropdown UI
   const activeSectors = ['Jewish', 'Muslim', 'Christian', 'Druze'].filter(s => state.sectors[s]);
   const btnText = document.getElementById('sector-dropdown-btn-text');
   if (activeSectors.length === 4) btnText.innerText = 'כל המגזרים (4)';
@@ -477,7 +490,7 @@ async function processCSVText(text){
       if(!map.has(name))map.set(name,{n:name,era:[2024,1949],s:{}});
       const e=map.get(name);
       
-      let sector = 'All'; // Fallback for old CSV style
+      let sector = 'All';
       if(!e.s[sector]) e.s[sector] = { m:0, f:0, ycM:{}, ycF:{} };
 
       for(let j=2;j<cols.length;j++){
@@ -531,7 +544,6 @@ document.getElementById('csv-file').addEventListener('change',async e=>{
 let baseUpdateTimer;
 function requestUpdateBaseNames(){clearTimeout(baseUpdateTimer);baseUpdateTimer=setTimeout(refreshBaseNames,250);}
 
-// Dynamic Mass Calculator per Active Sectors & Year
 function calculateMass(nameObj, gender, birthYear){
   let sum = 0;
   for(const sName of Object.keys(nameObj.s)) {
@@ -557,7 +569,6 @@ function refreshBaseNames(){
   
   const threshold=parseInt(document.getElementById('common-threshold').value)|| 50;
   
-  // Map and cache mass for incredible performance boost
   baseNames=DB.map(name => {
       name._mass = calculateMass(name, gender, birthYear);
       return name;
@@ -614,7 +625,7 @@ function applyFilters(names){
   let r=[...names];
   if(state.length>0)r=r.filter(n=>n.n.length===state.length);
   state.filters.forEach(f=>{
-    if(f.type==='length_excludes')r=r.filter(n=>n.n.length!==f.val); // Filter length out
+    if(f.type==='length_excludes')r=r.filter(n=>n.n.length!==f.val);
     if(f.type==='exact')r=f.pos===0?r.filter(n=>n.n.endsWith(f.letter)):r.filter(n=>n.n[f.pos-1]===f.letter);
     if(f.type==='exact_excludes')r=f.pos===0?r.filter(n=>!n.n.endsWith(f.letter)):r.filter(n=>n.n[f.pos-1]!==f.letter);
     if(f.type==='includes')r=r.filter(n=>n.n.includes(f.letter));
@@ -630,67 +641,162 @@ function applyFilters(names){
   return r;
 }
 
-const POS_LABELS = ['ראשונה','שנייה','שלישית','רביעית','חמישית','שישית'];
+// ── Suggestion Engine ────────────────────────────────────────────────
+// Priority tiers (higher = shown first):
+//   3 — first/last letter (always valuable regardless of known length)
+//   2 — length question
+//   2 — inner positional (only when length known)
+//   1 — letter membership (contains/not)
+//   0 — repeat question
 
 function getSuggestions(names){
   if(names.length<=1)return[];
-  const total=names.length, tMass=names.reduce((a,n)=>a+n._mass,0)||1, sugg=[];
 
-  if(state.length === 0){
-    const lens = {}; names.forEach(n=>lens[n.n.length]=(lens[n.n.length]||0)+n._mass);
-    Object.entries(lens).forEach(([l, mass])=>{
-      const pY = mass/tMass;
-      if(pY > 0.05 && pY < 0.95)
-        sugg.push({q:`השם בן ${l} אותיות?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'length', val:parseInt(l)});
-    });
-  }
+  const total  = names.length;
+  const tMass  = names.reduce((a,n)=>a+n._mass,0) || 1;
+  const knownLen = state.length; // 0 = unknown
+  const sugg   = [];
 
-  const alreadyHasRepeatFilter = state.filters.some(f=>f.type==='has_repeat'||f.type==='no_repeat');
-  if(!alreadyHasRepeatFilter){
-    const repeatNames = names.filter(n=>new Set(n.n).size < n.n.length);
-    const repeatMass = repeatNames.reduce((a,n)=>a+n._mass,0);
-    const pY = repeatMass/tMass;
-    if(pY > 0.1 && pY < 0.9)
-      sugg.push({q:'האם יש בשם אות שחוזרת על עצמה?', probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'repeat_general'});
-  }
+  // Helper: build a suggestion object
+  const makeSugg = (q, probYes, type, opts={}, tier=1, positional=false) => {
+    const balance = 1 - Math.abs(0.5 - probYes) * 2;
+    return { q, probYes, balance, type, positional, tier, ...opts };
+  };
 
-  const ac=new Set(names.flatMap(n=>n.n.split('')));
-  ac.forEach(letter=>{
-    const alreadyFiltered = state.filters.some(f=>(f.letter===letter && (f.type==='includes'||f.type==='excludes')));
-    if(alreadyFiltered) return;
-
-    let yC=0, yM=0;
-    names.forEach(n=>{if(n.n.includes(letter)){yC++;yM+=n._mass;}});
-    if(yC>0&&yC<total){
-      const pY=yM/tMass;
-      sugg.push({q:`האם יש בשם את האות "${escapeHTML(letter)}"?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'includes', letter});
-    }
-  });
-
-  if(total < 100){
-    for(let pos=0; pos<6; pos++){
-      const lettersAtPos = {};
-      names.forEach(n=>{if(n.n[pos]) lettersAtPos[n.n[pos]]=(lettersAtPos[n.n[pos]]||0)+n._mass});
-      Object.entries(lettersAtPos).forEach(([l, mass])=>{
-        const pY = mass/tMass;
-        if(pY > 0.15 && pY < 0.85)
-          sugg.push({q:`האות ה${POS_LABELS[pos]} היא "${escapeHTML(l)}"?`, probYes:pY, balance:1-Math.abs(0.5-pY)*2, type:'exact', pos:pos+1, letter:l});
+  // ── TIER 3: First letter ────────────────────────────────────────
+  // Always suggest first-letter questions regardless of known length.
+  {
+    const alreadyDone = state.filters.some(f => f.type === 'exact' && f.pos === 1);
+    if (!alreadyDone) {
+      const lettersAtFirst = {};
+      names.forEach(n => {
+        if (n.n[0]) lettersAtFirst[n.n[0]] = (lettersAtFirst[n.n[0]] || 0) + n._mass;
+      });
+      Object.entries(lettersAtFirst).forEach(([l, mass]) => {
+        const pY = mass / tMass;
+        if (pY > 0.10 && pY < 0.90)
+          sugg.push(makeSugg(
+            `האות הראשונה בשם היא "${escapeHTML(l)}"?`,
+            pY, 'exact', { letter: l, val: 1 }, 3, true
+          ));
       });
     }
   }
 
-  return sugg.sort((a,b)=>b.balance-a.balance).slice(0,4);
+  // ── TIER 3: Last letter ─────────────────────────────────────────
+  // Use pos=0 convention (= endsWith) so it works without knowing length.
+  {
+    const alreadyDone = state.filters.some(f =>
+      (f.type === 'exact' && f.pos === 0) ||
+      (knownLen > 0 && f.type === 'exact' && f.pos === knownLen)
+    );
+    if (!alreadyDone) {
+      const lettersAtLast = {};
+      names.forEach(n => {
+        const last = n.n[n.n.length - 1];
+        if (last) lettersAtLast[last] = (lettersAtLast[last] || 0) + n._mass;
+      });
+      Object.entries(lettersAtLast).forEach(([l, mass]) => {
+        const pY = mass / tMass;
+        if (pY > 0.10 && pY < 0.90)
+          sugg.push(makeSugg(
+            `האות האחרונה בשם היא "${escapeHTML(l)}"?`,
+            pY, 'exact', { letter: l, val: 0 }, 3, true
+          ));
+      });
+    }
+  }
+
+  // ── TIER 2: Length question ─────────────────────────────────────
+  if (knownLen === 0) {
+    const lens = {};
+    names.forEach(n => lens[n.n.length] = (lens[n.n.length] || 0) + n._mass);
+    Object.entries(lens).forEach(([l, mass]) => {
+      const pY = mass / tMass;
+      if (pY > 0.05 && pY < 0.95)
+        sugg.push(makeSugg(`השם בן ${l} אותיות?`, pY, 'length', { val: parseInt(l) }, 2));
+    });
+  }
+
+  // ── TIER 2: Inner positional letters (pos 2 … length-1) ────────
+  // Only when we know the exact length; skip first and last (covered above).
+  if (knownLen > 2 && total < 200) {
+    for (let pos = 2; pos < knownLen; pos++) {
+      const alreadyDone = state.filters.some(f => f.type === 'exact' && f.pos === pos);
+      if (alreadyDone) continue;
+
+      const lettersAtPos = {};
+      names.forEach(n => {
+        if (n.n[pos - 1]) lettersAtPos[n.n[pos-1]] = (lettersAtPos[n.n[pos-1]] || 0) + n._mass;
+      });
+      Object.entries(lettersAtPos).forEach(([l, mass]) => {
+        const pY = mass / tMass;
+        if (pY > 0.15 && pY < 0.85)
+          sugg.push(makeSugg(
+            `האות ה${posLabel(pos, knownLen)} בשם היא "${escapeHTML(l)}"?`,
+            pY, 'exact', { letter: l, val: pos }, 2, true
+          ));
+      });
+    }
+  }
+
+  // ── TIER 1: Letter membership (contains / not) ──────────────────
+  const ac = new Set(names.flatMap(n => n.n.split('')));
+  ac.forEach(letter => {
+    const alreadyFiltered = state.filters.some(f =>
+      f.letter === letter && (f.type === 'includes' || f.type === 'excludes')
+    );
+    // Skip if we already have a positional question for this letter at top tier
+    const coveredByPositional = sugg.some(s =>
+      s.letter === letter && s.tier >= 2 && s.positional
+    );
+    if (alreadyFiltered || coveredByPositional) return;
+
+    let yM = 0;
+    let yC = 0;
+    names.forEach(n => { if(n.n.includes(letter)){ yC++; yM += n._mass; } });
+    if (yC > 0 && yC < total) {
+      const pY = yM / tMass;
+      sugg.push(makeSugg(
+        `האם יש בשם את האות "${escapeHTML(letter)}"?`,
+        pY, 'includes', { letter }, 0
+      ));
+    }
+  });
+
+  // ── TIER 0: Repeat letters ──────────────────────────────────────
+  const alreadyHasRepeatFilter = state.filters.some(f => f.type==='has_repeat'||f.type==='no_repeat');
+  if (!alreadyHasRepeatFilter) {
+    const repeatMass = names.filter(n => new Set(n.n).size < n.n.length).reduce((a,n)=>a+n._mass,0);
+    const pY = repeatMass / tMass;
+    if (pY > 0.1 && pY < 0.9)
+      sugg.push(makeSugg('האם יש בשם אות שחוזרת על עצמה?', pY, 'repeat_general', {}, 1));
+  }
+
+  // ── Sort: tier desc, then balance desc; deduplicate by question ──
+  sugg.sort((a,b) => b.tier !== a.tier ? b.tier - a.tier : b.balance - a.balance);
+
+  // Keep only the best question per unique (type+letter+val) combo,
+  // then return top 5 after dedup.
+  const seen = new Set();
+  const deduped = [];
+  for (const s of sugg) {
+    const key = `${s.type}|${s.letter||''}|${s.val||0}`;
+    if (!seen.has(key)) { seen.add(key); deduped.push(s); }
+    if (deduped.length >= 5) break;
+  }
+  return deduped;
 }
 
-function applySuggestion(type,isYes,vp,letter){
-  if(type==='length') {
+function applySuggestion(type, isYes, vp, letter){
+  if (type === 'length') {
     if(isYes) setLength(vp); else state.filters.push({type:'length_excludes', val:vp});
-  } else if(type==='repeat_general'){
-    state.filters.push({type:isYes?'has_repeat':'no_repeat'});
-  } else if(type==='exact'){
-    state.filters.push({type:isYes?'exact':'exact_excludes', pos:vp, letter});
+  } else if (type === 'repeat_general') {
+    state.filters.push({type: isYes ? 'has_repeat' : 'no_repeat'});
+  } else if (type === 'exact') {
+    state.filters.push({type: isYes ? 'exact' : 'exact_excludes', pos: vp, letter});
   } else {
-    state.filters.push({type:isYes?'includes':'excludes', letter});
+    state.filters.push({type: isYes ? 'includes' : 'excludes', letter});
   }
   update();
 }
@@ -722,8 +828,14 @@ function renderChips(){
     let cls = f.type.includes('excl') || f.type==='no_repeat' ? 'chip-excludes' : '';
     let label = f.letter || (f.type==='has_repeat'?'יש אות חוזרת':(f.type==='no_repeat'?'אין אות חוזרת':(f.type==='length_excludes'?'לא '+f.val+' אותיות':'')));
     if(f.type==='repeat_letter') label = (f.letter||'כלשהי') + ' ×' + (f.pos||2);
-    if(f.type==='exact') label = 'מ'+f.pos+': '+f.letter;
-    if(f.type==='exact_excludes') label = 'לא מ'+f.pos+': '+f.letter;
+    if(f.type==='exact') {
+      const lbl = posLabel(f.pos, state.length);
+      label = lbl + ': ' + f.letter;
+    }
+    if(f.type==='exact_excludes') {
+      const lbl = posLabel(f.pos, state.length);
+      label = 'לא ' + lbl + ': ' + f.letter;
+    }
     return `<div class="chip ${cls}">${label}<span class="chip-x" data-index="${i}">×</span></div>`;
   }).join('');
 }
@@ -753,19 +865,20 @@ function renderNames(){
 
 function renderSuggestions(){
   const sugg=getSuggestions(filteredNames);
-  document.getElementById('suggestion-list').innerHTML=sugg.length ? sugg.map(s=>`
-    <div class="suggestion">
+  document.getElementById('suggestion-list').innerHTML = sugg.length ? sugg.map(s=>`
+    <div class="suggestion${s.positional ? ' positional' : ''}">
       <div class="suggestion-q">${s.q}</div>
       <div class="suggestion-actions">
-        <button class="sugg-btn yes" data-type="${s.type}" data-yes="true" data-letter="${s.letter||''}" data-val="${s.val||s.pos||0}">
+        <button class="sugg-btn yes" data-type="${s.type}" data-yes="true" data-letter="${s.letter||''}" data-val="${s.val !== undefined ? s.val : 0}">
           <span>כן</span><span>${(s.probYes*100).toFixed(0)}%</span>
         </button>
-        <button class="sugg-btn no" data-type="${s.type}" data-yes="false" data-letter="${s.letter||''}" data-val="${s.val||s.pos||0}">
+        <button class="sugg-btn no" data-type="${s.type}" data-yes="false" data-letter="${s.letter||''}" data-val="${s.val !== undefined ? s.val : 0}">
           <span>לא</span><span>${((1-s.probYes)*100).toFixed(0)}%</span>
         </button>
       </div>
       <div class="suggestion-bar"><div class="suggestion-bar-fill" style="width:${s.probYes*100}%"></div></div>
-    </div>`).join('') : '<div class="empty-state">אין הצעות נוספות</div>';
+    </div>`).join('')
+  : '<div class="empty-state">אין הצעות נוספות</div>';
 }
 
 function resetAll(){
