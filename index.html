@@ -361,8 +361,8 @@ header {
 const APP_VERSION = 'v3.1 Positional';
 let DB = [];
 let state = { 
-  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true,
-  sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true } 
+  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true, // <-- Change this to true
+  sectors: { Jewish: true, Muslim: true, Christian: true, Druze: true, All: true } 
 };
 let baseNames = [], filteredNames = [];
 
@@ -407,6 +407,7 @@ async function saveNamesToDB(arr){const db=await initDB();return new Promise((re
 window.onload=async function(){
   document.getElementById('app-version').innerText=APP_VERSION;
   startAppHandlers();
+  syncUI(); // <-- Add this line here!
   const saved=await loadNamesFromDB();
   if(saved&&saved.length>0){DB=saved;refreshBaseNames();}else attemptAutoLoad();
 };
