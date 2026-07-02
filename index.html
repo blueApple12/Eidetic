@@ -276,6 +276,7 @@ header {
           <div class="gender-btn" data-g="f" onclick="setGender('f')">נקבה</div>
           <div class="gender-btn active" data-g="u" onclick="setGender('u')">שניהם</div>
         </div>
+        <div class="toggle-btn" id="exclusive-btn" onclick="toggleExclusive()" title="הסתר שמות שנפוצים (70+ בשנה) בשני המגדרים" style="margin-top:4px;font-size:11px;">מגדר בלעדי</div>
       </div>
     </div>
 
@@ -360,10 +361,12 @@ header {
 <script>
 const APP_VERSION = 'v3.1 Positional';
 let DB = [];
-let state = { 
-  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true,
+let state = {
+  age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true, exclusiveGender: false,
   sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true } // <-- Change to this
 };
+// Peak yearly births needed in the OTHER gender to disqualify a name as gender-exclusive.
+const EXCLUSIVE_THRESHOLD = 70;
 let baseNames = [], filteredNames = [];
 
 const escapeHTML = s => s.replace(/[&<>'"]/g, t=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
@@ -450,6 +453,7 @@ function handleTypeChange(){
 
 function setGender(g){state.gender=g;document.querySelectorAll('.gender-btn').forEach(b=>b.classList.toggle('active',b.dataset.g===g));requestUpdateBaseNames();}
 function toggleCommon(){state.commonOnly=!state.commonOnly;syncUI();requestUpdateBaseNames();}
+function toggleExclusive(){state.exclusiveGender=!state.exclusiveGender;syncUI();requestUpdateBaseNames();}
 function toggleSector(sec, event) {
   if(event) event.stopPropagation();
   state.sectors[sec] = !state.sectors[sec];
@@ -461,6 +465,9 @@ function syncUI(){
   const b=document.getElementById('common-btn'),i=document.getElementById('common-threshold');
   b.classList.toggle('active',state.commonOnly); b.innerText=state.commonOnly?'נפוצים':'ללא סינון';
   i.disabled=!state.commonOnly; i.classList.toggle('active',state.commonOnly);
+
+  const ex=document.getElementById('exclusive-btn');
+  if(ex) ex.classList.toggle('active',state.exclusiveGender);
   
   const activeSectors = ['Jewish', 'Muslim', 'Christian', 'Druze'].filter(s => state.sectors[s]);
   const btnText = document.getElementById('sector-dropdown-btn-text');
@@ -573,20 +580,47 @@ function calculateMass(nameObj, gender, birthYear){
   return sum;
 }
 
+// Peak births in a single year for one gender across the active sectors.
+// Uses the ±2yr window around birthYear when known, else the all-time peak year.
+function genderYearlyPeak(nameObj, gender, birthYear){
+  const key = gender==='m' ? 'ycM' : 'ycF';
+  let peak = 0;
+  for(const sName of Object.keys(nameObj.s)){
+    if(sName !== 'All' && !state.sectors[sName]) continue;
+    const yc = nameObj.s[sName][key];
+    if(birthYear!==null){
+      for(let y=birthYear-2; y<=birthYear+2; y++){ const v=yc[y]||0; if(v>peak) peak=v; }
+    } else {
+      for(const y in yc){ if(yc[y]>peak) peak=yc[y]; }
+    }
+  }
+  return peak;
+}
+
 function refreshBaseNames(){
-  const {age, gender, commonOnly}=state;
+  const {age, gender, commonOnly, exclusiveGender}=state;
   const birthYear = age ? Math.min(2024, 2026 - age) : null;
   state.birthYear = birthYear;
-  
+
   const threshold=parseInt(document.getElementById('common-threshold').value)|| 50;
-  
+
   baseNames=DB.map(name => {
       name._mass = calculateMass(name, gender, birthYear);
       return name;
   }).filter(name=>{
     if(name._mass <= 0) return false;
     if(birthYear!==null && (birthYear<name.era[0]-5 || birthYear>name.era[1]+5)) return false;
-    
+
+    // Exclusive-gender: drop names that are common (70+/yr) in the disqualifying gender.
+    // m → hide if female also common; f → hide if male also common; u → hide only unisex.
+    if(exclusiveGender){
+      const mPeak = genderYearlyPeak(name, 'm', birthYear);
+      const fPeak = genderYearlyPeak(name, 'f', birthYear);
+      if(gender==='m' && fPeak >= EXCLUSIVE_THRESHOLD) return false;
+      if(gender==='f' && mPeak >= EXCLUSIVE_THRESHOLD) return false;
+      if(gender==='u' && mPeak >= EXCLUSIVE_THRESHOLD && fPeak >= EXCLUSIVE_THRESHOLD) return false;
+    }
+
     if(commonOnly){
       let isCommon = false;
       if(birthYear!==null){
@@ -925,7 +959,7 @@ function renderSuggestions(){
 
 function resetAll(){
   state={
-    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:state.commonOnly,
+    age:null, birthYear:null, gender:'u', length:0, filters:[], commonOnly:state.commonOnly, exclusiveGender:state.exclusiveGender,
     sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true }
   };
   document.getElementById('age-input').value='';
