@@ -276,7 +276,7 @@ header {
           <div class="gender-btn" data-g="f" onclick="setGender('f')">נקבה</div>
           <div class="gender-btn active" data-g="u" onclick="setGender('u')">שניהם</div>
         </div>
-        <div class="toggle-btn" id="exclusive-btn" onclick="toggleExclusive()" title="הסתר שמות שנפוצים (70+ בשנה) בשני המגדרים" style="margin-top:4px;font-size:11px;">מגדר בלעדי</div>
+        <div class="toggle-btn" id="exclusive-btn" onclick="toggleExclusive()" title="הסתר שמות שנפוצים בשני המגדרים לפי סף התפוצה (או 50 כברירת מחדל)" style="margin-top:4px;font-size:11px;">מגדר בלעדי</div>
       </div>
     </div>
 
@@ -365,8 +365,6 @@ let state = {
   age: null, birthYear: null, gender: 'u', length: 0, filters: [], commonOnly: true, exclusiveGender: false,
   sectors: { Jewish: true, Muslim: false, Christian: false, Druze: false, All: true } // <-- Change to this
 };
-// Peak yearly births needed in the OTHER gender to disqualify a name as gender-exclusive.
-const EXCLUSIVE_THRESHOLD = 70;
 let baseNames = [], filteredNames = [];
 
 const escapeHTML = s => s.replace(/[&<>'"]/g, t=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[t]));
@@ -611,14 +609,16 @@ function refreshBaseNames(){
     if(name._mass <= 0) return false;
     if(birthYear!==null && (birthYear<name.era[0]-5 || birthYear>name.era[1]+5)) return false;
 
-    // Exclusive-gender: drop names that are common (70+/yr) in the disqualifying gender.
+    // Exclusive-gender: drop names common in the disqualifying gender.
+    // Threshold tracks תפוצה when the common filter is on, else defaults to 50.
     // m → hide if female also common; f → hide if male also common; u → hide only unisex.
     if(exclusiveGender){
+      const exclThreshold = commonOnly ? threshold : 50;
       const mPeak = genderYearlyPeak(name, 'm', birthYear);
       const fPeak = genderYearlyPeak(name, 'f', birthYear);
-      if(gender==='m' && fPeak >= EXCLUSIVE_THRESHOLD) return false;
-      if(gender==='f' && mPeak >= EXCLUSIVE_THRESHOLD) return false;
-      if(gender==='u' && mPeak >= EXCLUSIVE_THRESHOLD && fPeak >= EXCLUSIVE_THRESHOLD) return false;
+      if(gender==='m' && fPeak >= exclThreshold) return false;
+      if(gender==='f' && mPeak >= exclThreshold) return false;
+      if(gender==='u' && mPeak >= exclThreshold && fPeak >= exclThreshold) return false;
     }
 
     if(commonOnly){
